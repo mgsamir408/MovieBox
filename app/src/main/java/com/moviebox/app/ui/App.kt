@@ -64,7 +64,7 @@ fun MovieBoxApp(prefs: Prefs, links: SavedLinks) {
         }
     ) { pad ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
-            composable("home") { HomeScreen(links, onOpenUrl = { BrowserTarget.url = it; nav.navigate("browser") }) }
+            composable("home") { HomeScreen() }
             composable("downloads") { DownloadsScreen() }
             composable("me") { MeScreen(onOpen = { nav.navigate(it) }) }
             composable("mylist") { MyListScreen(onBack = { nav.popBackStack() }) }

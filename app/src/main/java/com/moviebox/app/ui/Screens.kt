@@ -53,14 +53,8 @@ import com.moviebox.app.data.Prefs
 
 /* ---------------- Home ---------------- */
 @Composable
-fun HomeScreen(links: SavedLinks, onOpenUrl: (String) -> Unit) {
+fun HomeScreen() {
     var query by remember { mutableStateOf("") }
-    fun go() {
-        val q = query.trim()
-        if (q.isEmpty()) return
-        val direct = if (q.contains('.')) SavedLinks.normalize(q) else null
-        onOpenUrl(direct ?: ("https://www.google.com/search?q=" + Uri.encode(q)))
-    }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             // App logo (replace with your real logo: painterResource(R.drawable.logo))
@@ -78,24 +72,15 @@ fun HomeScreen(links: SavedLinks, onOpenUrl: (String) -> Unit) {
                     query, { query = it }, Modifier.weight(1f), singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
                     cursorBrush = SolidColor(Accent),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { go() }),
                     decorationBox = { inner ->
-                        if (query.isEmpty()) Text("Search or paste a link", color = Muted, fontSize = 14.sp)
+                        if (query.isEmpty()) Text("Search movies, series, anime", color = Muted, fontSize = 14.sp)
                         inner()
                     }
                 )
-                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { go() }.padding(start = 8.dp))
+                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { /* TODO: search the movie catalog */ }.padding(start = 8.dp))
             }
         }
-        if (links.items.isEmpty()) {
-            Placeholder("Save a website in Me > Web Link and it shows up here", Modifier.weight(1f).padding(bottom = 16.dp))
-        } else {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                SectionHeader("Your sites", "${links.items.size}")
-                CardBox { links.items.forEach { SiteRow(it, { onOpenUrl(it) }) } }
-            }
-        }
+        Placeholder("Movies will appear here", Modifier.weight(1f).padding(bottom = 16.dp))
     }
 }
 
@@ -183,7 +168,7 @@ fun MeScreen(onOpen: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 16.dp)) {
         CardBox {
             NavRow({ Icon(Icons.Outlined.History, null, tint = Color.White) }, "Watch History") { /* TODO: history screen */ }
-            Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (Library.watchHistory.isNotEmpty()) Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Library.watchHistory.take(4).forEachIndexed { i, name ->
                     Column(Modifier.weight(1f)) {
                         Box(Modifier.fillMaxWidth().aspectRatio(0.75f).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(tileColors[i % 4])))
