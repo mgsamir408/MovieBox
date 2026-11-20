@@ -14,8 +14,8 @@ class Prefs(context: Context) {
     var autoMiniplayer by mutableStateOf(sp.getBoolean("mini", true)); private set
     var watchMode by mutableStateOf(sp.getString("watch", "Streaming") ?: "Streaming"); private set
 
-    fun setFamilyMode(v: Boolean) { familyMode = v; sp.edit().putBoolean("family", v).apply() }
-    fun setBackgroundDownload(v: Boolean) { backgroundDownload = v; sp.edit().putBoolean("bg_dl", v).apply() }
-    fun setAutoMiniplayer(v: Boolean) { autoMiniplayer = v; sp.edit().putBoolean("mini", v).apply() }
-    fun setWatchMode(v: String) { watchMode = v; sp.edit().putString("watch", v).apply() }
+    fun updateFamilyMode(v: Boolean) { familyMode = v; sp.edit().putBoolean("family", v).apply() }
+    fun updateBackgroundDownload(v: Boolean) { backgroundDownload = v; sp.edit().putBoolean("bg_dl", v).apply() }
+    fun updateAutoMiniplayer(v: Boolean) { autoMiniplayer = v; sp.edit().putBoolean("mini", v).apply() }
+    fun updateWatchMode(v: String) { watchMode = v; sp.edit().putString("watch", v).apply() }
 }

@@ -189,11 +189,11 @@ fun SettingsScreen(prefs: Prefs, onBack: () -> Unit, onOpen: (String) -> Unit) {
             HorizontalDivider(color = Divider, modifier = Modifier.padding(horizontal = 16.dp))
             NavRow({}, "Watch Options", prefs.watchMode) { onOpen("watchoptions") }
             HorizontalDivider(color = Divider, modifier = Modifier.padding(horizontal = 16.dp))
-            ToggleRow("Family Mode", prefs.familyMode, "This helps hide potentially mature videos. No filter is 100% accurate.") { prefs.setFamilyMode(it) }
+            ToggleRow("Family Mode", prefs.familyMode, "This helps hide potentially mature videos. No filter is 100% accurate.") { prefs.updateFamilyMode(it) }
             HorizontalDivider(color = Divider, modifier = Modifier.padding(horizontal = 16.dp))
-            ToggleRow("Download in background", prefs.backgroundDownload) { prefs.setBackgroundDownload(it) }
+            ToggleRow("Download in background", prefs.backgroundDownload) { prefs.updateBackgroundDownload(it) }
             HorizontalDivider(color = Divider, modifier = Modifier.padding(horizontal = 16.dp))
-            ToggleRow("Auto activate Miniplayer", prefs.autoMiniplayer, "When enabled, switching pages during playback will automatically enable Miniplayer.") { prefs.setAutoMiniplayer(it) }
+            ToggleRow("Auto activate Miniplayer", prefs.autoMiniplayer, "When enabled, switching pages during playback will automatically enable Miniplayer.") { prefs.updateAutoMiniplayer(it) }
         }
     }
 }
@@ -213,7 +213,7 @@ fun WatchOptionsScreen(prefs: Prefs, onBack: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         GradientButton("Restart to Apply") {
-            prefs.setWatchMode(sel)
+            prefs.updateWatchMode(sel)
             val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
             if (launch != null) {
                 ctx.startActivity(Intent.makeRestartActivityTask(launch.component))
