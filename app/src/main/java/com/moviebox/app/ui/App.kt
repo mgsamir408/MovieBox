@@ -20,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.moviebox.app.data.Movie
 import com.moviebox.app.data.Prefs
 import com.moviebox.app.data.SavedLinks
 
@@ -64,10 +65,12 @@ fun MovieBoxApp(prefs: Prefs, links: SavedLinks) {
         }
     ) { pad ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
-            composable("home") { HomeScreen() }
+            composable("home") { HomeScreen(onOpen = { Selected.movie = it; nav.navigate("details") }) }
+            composable("details") { DetailsScreen(onBack = { nav.popBackStack() }, onPlay = { Selected.playUrl = it; nav.navigate("player") }) }
+            composable("player") { PlayerScreen(onBack = { nav.popBackStack() }) }
             composable("downloads") { DownloadsScreen() }
             composable("me") { MeScreen(onOpen = { nav.navigate(it) }) }
-            composable("mylist") { MyListScreen(onBack = { nav.popBackStack() }) }
+            composable("mylist") { MyListScreen(onBack = { nav.popBackStack() }, onOpen = { Selected.movie = Movie(it.id, it.name, it.meta); nav.navigate("details") }) }
             composable("weblink") { WebLinkScreen(links, onBack = { nav.popBackStack() }, onOpenUrl = { BrowserTarget.url = it; nav.navigate("browser") }) }
             composable("browser") { BrowserScreen(links, onBack = { nav.popBackStack() }) }
             composable("settings") { SettingsScreen(prefs, onBack = { nav.popBackStack() }, onOpen = { nav.navigate(it) }) }

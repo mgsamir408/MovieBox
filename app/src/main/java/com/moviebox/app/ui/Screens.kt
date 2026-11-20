@@ -44,45 +44,15 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import kotlinx.coroutines.delay
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import com.moviebox.app.data.Title
 import com.moviebox.app.data.DlItem
 import com.moviebox.app.data.Library
 import com.moviebox.app.data.SavedLinks
 import com.moviebox.app.data.formatBytes
 import com.moviebox.app.data.queryDownloads
 import com.moviebox.app.data.Prefs
-
-/* ---------------- Home ---------------- */
-@Composable
-fun HomeScreen() {
-    var query by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            // App logo (replace with your real logo: painterResource(R.drawable.logo))
-            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Gradient), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.PlayArrow, "MovieBox", tint = OnAccent, modifier = Modifier.size(28.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Row(
-                Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(12.dp)).background(Field).padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Search, null, tint = Muted, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                BasicTextField(
-                    query, { query = it }, Modifier.weight(1f), singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
-                    cursorBrush = SolidColor(Accent),
-                    decorationBox = { inner ->
-                        if (query.isEmpty()) Text("Search movies, series, anime", color = Muted, fontSize = 14.sp)
-                        inner()
-                    }
-                )
-                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { /* TODO: search the movie catalog */ }.padding(start = 8.dp))
-            }
-        }
-        Placeholder("Movies will appear here", Modifier.weight(1f).padding(bottom = 16.dp))
-    }
-}
 
 @Composable
 private fun SiteRow(url: String, onClick: () -> Unit, trailing: (@Composable () -> Unit)? = null) {
@@ -186,24 +156,24 @@ fun MeScreen(onOpen: (String) -> Unit) {
 
 /* ---------------- My List ---------------- */
 @Composable
-fun MyListScreen(onBack: () -> Unit) {
+fun MyListScreen(onBack: () -> Unit, onOpen: (Title) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopBar("My List", onBack)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
             Library.myList.groupBy { it.savedOn }.forEach { (date, titles) ->
                 Text(date, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 12.dp))
                 titles.forEach { t ->
-                    Row(Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(64.dp, 88.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(tileColors[1])))
+                    Row(Modifier.clickable { onOpen(t) }.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(
+                            model = "https://archive.org/services/img/${t.id}", contentDescription = t.name, contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(64.dp, 88.dp).clip(RoundedCornerShape(8.dp)).background(Field)
+                        )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(t.name, color = Color.White, fontWeight = FontWeight.Medium)
-                            Row(Modifier.padding(top = 6.dp)) {
-                                Text("★ ${t.rating}", color = Color(0xFFF5B73A), fontSize = 13.sp)
-                                Text("  |  ${t.meta}", color = Muted, fontSize = 13.sp)
-                            }
+                            if (t.meta.isNotEmpty()) Text(t.meta, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                         }
-                        RoundIcon(Color(0xFFD9DBE0)) { Icon(Icons.Filled.PlayArrow, "Play", tint = Bg) }
+                        RoundIcon(Color(0xFFD9DBE0)) { Icon(Icons.Filled.PlayArrow, "Open", tint = Bg) }
                     }
                 }
             }

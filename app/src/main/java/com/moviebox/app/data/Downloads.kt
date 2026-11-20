@@ -2,6 +2,9 @@ package com.moviebox.app.data
 
 import android.app.DownloadManager
 import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
 
 data class DlItem(val id: Long, val title: String, val status: Int, val done: Long, val total: Long, val mime: String?) {
     val active get() = status != DownloadManager.STATUS_SUCCESSFUL
@@ -30,4 +33,18 @@ fun formatBytes(b: Long): String = when {
     b >= 1_048_576 -> "%.1f MB".format(b / 1_048_576.0)
     b > 0 -> "%.0f KB".format(b / 1024.0)
     else -> "0 KB"
+}
+
+fun enqueueDownload(ctx: Context, url: String, name: String) {
+    try {
+        val req = DownloadManager.Request(Uri.parse(url))
+            .setTitle(name)
+            .setMimeType("video/mp4")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalFilesDir(ctx, Environment.DIRECTORY_DOWNLOADS, name)
+        (ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+        Toast.makeText(ctx, "Download started", Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Toast.makeText(ctx, "Could not start download", Toast.LENGTH_SHORT).show()
+    }
 }
