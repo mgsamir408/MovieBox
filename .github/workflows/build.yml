@@ -14,9 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unzip project
-        run: unzip -q MovieBox-android.zip -d src
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,17 +24,17 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build debug APK
-        working-directory: src
         run: gradle assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp src/app/build/outputs/apk/debug/app-debug.apk MovieBox.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk MovieBox.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: MovieBox-apk
           path: MovieBox.apk
 
+      # Direct download link: Releases page -> "MovieBox latest" -> MovieBox.apk
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
