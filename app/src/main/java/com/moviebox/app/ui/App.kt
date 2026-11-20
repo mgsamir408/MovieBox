@@ -5,8 +5,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -22,8 +20,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.moviebox.app.data.Library
 import com.moviebox.app.data.Prefs
+import com.moviebox.app.data.SavedLinks
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
@@ -34,7 +32,7 @@ private val tabs = listOf(
 )
 
 @Composable
-fun MovieBoxApp(prefs: Prefs) {
+fun MovieBoxApp(prefs: Prefs, links: SavedLinks) {
     val nav = rememberNavController()
     val route = nav.currentBackStackEntryAsState().value?.destination?.route
     Scaffold(
@@ -52,13 +50,7 @@ fun MovieBoxApp(prefs: Prefs) {
                                     restoreState = true
                                 }
                             },
-                            icon = {
-                                if (t.route == "downloads" && Library.downloading.isNotEmpty()) {
-                                    BadgedBox(badge = { Badge { Text("${Library.downloading.size}") } }) {
-                                        Icon(t.icon, t.label)
-                                    }
-                                } else Icon(t.icon, t.label)
-                            },
+                            icon = { Icon(t.icon, t.label) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Accent, selectedTextColor = Accent,
@@ -72,11 +64,12 @@ fun MovieBoxApp(prefs: Prefs) {
         }
     ) { pad ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
-            composable("home") { HomeScreen() }
+            composable("home") { HomeScreen(links, onOpenUrl = { BrowserTarget.url = it; nav.navigate("browser") }) }
             composable("downloads") { DownloadsScreen() }
             composable("me") { MeScreen(onOpen = { nav.navigate(it) }) }
             composable("mylist") { MyListScreen(onBack = { nav.popBackStack() }) }
-            composable("weblink") { WebLinkScreen(onBack = { nav.popBackStack() }) }
+            composable("weblink") { WebLinkScreen(links, onBack = { nav.popBackStack() }, onOpenUrl = { BrowserTarget.url = it; nav.navigate("browser") }) }
+            composable("browser") { BrowserScreen(links, onBack = { nav.popBackStack() }) }
             composable("settings") { SettingsScreen(prefs, onBack = { nav.popBackStack() }, onOpen = { nav.navigate(it) }) }
             composable("watchoptions") { WatchOptionsScreen(prefs, onBack = { nav.popBackStack() }) }
         }

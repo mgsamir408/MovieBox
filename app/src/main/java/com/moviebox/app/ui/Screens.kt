@@ -1,6 +1,10 @@
 package com.moviebox.app.ui
 
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
@@ -16,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Search
@@ -35,13 +40,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.coroutines.delay
+import com.moviebox.app.data.DlItem
 import com.moviebox.app.data.Library
+import com.moviebox.app.data.SavedLinks
+import com.moviebox.app.data.formatBytes
+import com.moviebox.app.data.queryDownloads
 import com.moviebox.app.data.Prefs
 
 /* ---------------- Home ---------------- */
 @Composable
-fun HomeScreen() {
+fun HomeScreen(links: SavedLinks, onOpenUrl: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
+    fun go() {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        val direct = if (q.contains('.')) SavedLinks.normalize(q) else null
+        onOpenUrl(direct ?: ("https://www.google.com/search?q=" + Uri.encode(q)))
+    }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             // App logo (replace with your real logo: painterResource(R.drawable.logo))
@@ -59,15 +78,40 @@ fun HomeScreen() {
                     query, { query = it }, Modifier.weight(1f), singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
                     cursorBrush = SolidColor(Accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { go() }),
                     decorationBox = { inner ->
-                        if (query.isEmpty()) Text("Search movies, series, anime", color = Muted, fontSize = 14.sp)
+                        if (query.isEmpty()) Text("Search or paste a link", color = Muted, fontSize = 14.sp)
                         inner()
                     }
                 )
-                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { /* TODO: run search */ }.padding(start = 8.dp))
+                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { go() }.padding(start = 8.dp))
             }
         }
-        Placeholder("Home content area", Modifier.weight(1f).padding(bottom = 16.dp))
+        if (links.items.isEmpty()) {
+            Placeholder("Save a website in Me > Web Link and it shows up here", Modifier.weight(1f).padding(bottom = 16.dp))
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                SectionHeader("Your sites", "${links.items.size}")
+                CardBox { links.items.forEach { SiteRow(it, { onOpenUrl(it) }) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SiteRow(url: String, onClick: () -> Unit, trailing: (@Composable () -> Unit)? = null) {
+    val host = Uri.parse(url).host?.removePrefix("www.") ?: url
+    Row(Modifier.fillMaxWidth().clickable { onClick() }.heightIn(min = 64.dp).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(Field), contentAlignment = Alignment.Center) {
+            Text(host.take(1).uppercase(), color = Accent, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(host, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(url, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (trailing != null) trailing() else Spacer(Modifier.width(16.dp))
     }
 }
 
@@ -79,22 +123,52 @@ private fun freeSpace(): String {
 
 @Composable
 fun DownloadsScreen() {
-    val items = Library.downloading
+    val ctx = LocalContext.current
+    val dm = remember { ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager }
+    var items by remember { mutableStateOf(emptyList<DlItem>()) }
+    var manage by remember { mutableStateOf(false) }
     val free = remember { freeSpace() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 16.dp)) {
-        SectionHeader("Downloading (${items.size})", "Manage", rightAccent = true, onRight = { /* TODO: manage downloads */ })
-        if (items.isEmpty()) Placeholder("No active downloads") else items.forEach { d ->
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(d.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${d.sizeMb} MB", color = Muted, fontSize = 13.sp)
-                }
-                Text(if (d.paused) "Paused" else "Downloading", color = if (d.paused) Color(0xFFE5484D) else Accent, fontSize = 13.sp)
+    LaunchedEffect(Unit) { while (true) { items = queryDownloads(ctx); delay(1500) } }
+    val active = items.filter { it.active }
+    val done = items.filter { !it.active }
+
+    @Composable
+    fun Row2(d: DlItem) {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = !d.active) {
+                try {
+                    ctx.startActivity(
+                        Intent(Intent.ACTION_VIEW).setDataAndType(dm.getUriForDownloadedFile(d.id), d.mime ?: "*/*")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (e: Exception) { Toast.makeText(ctx, "No app can open this file", Toast.LENGTH_SHORT).show() }
+            }.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(d.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val size = if (d.active && d.total > 0) "${formatBytes(d.done)} / ${formatBytes(d.total)}" else formatBytes(if (d.total > 0) d.total else d.done)
+                Text(size, color = Muted, fontSize = 13.sp)
             }
+            if (d.active) {
+                val (label, col) = when (d.status) {
+                    DownloadManager.STATUS_FAILED -> "Failed" to Color(0xFFE5484D)
+                    DownloadManager.STATUS_PAUSED -> "Paused" to Color(0xFFE5484D)
+                    DownloadManager.STATUS_PENDING -> "Waiting" to Muted
+                    else -> "Downloading" to Accent
+                }
+                Text(label, color = col, fontSize = 13.sp)
+            }
+            if (manage) IconButton({ dm.remove(d.id) }) { Icon(Icons.Outlined.Delete, "Delete", tint = Color(0xFFE5484D)) }
         }
+    }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 16.dp)) {
+        SectionHeader("Downloading (${active.size})", if (manage) "Done" else "Manage", rightAccent = true, onRight = { manage = !manage })
+        if (active.isEmpty()) Placeholder("No active downloads") else active.forEach { Row2(it) }
         Spacer(Modifier.height(24.dp))
         SectionHeader("Downloaded", free)
-        Placeholder("Finished downloads appear here")
+        if (done.isEmpty()) Placeholder("Finished downloads appear here") else done.forEach { Row2(it) }
     }
 }
 
@@ -158,17 +232,32 @@ fun MyListScreen(onBack: () -> Unit) {
 
 /* ---------------- Web Link ---------------- */
 @Composable
-fun WebLinkScreen(onBack: () -> Unit) {
+fun WebLinkScreen(links: SavedLinks, onBack: () -> Unit, onOpenUrl: (String) -> Unit) {
+    val ctx = LocalContext.current
     var link by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopBar("Web Link", onBack)
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Paste a video link", color = Muted, fontSize = 14.sp)
+            Text("Paste a website link to save it", color = Muted, fontSize = 14.sp)
             BasicTextField(
                 link, { link = it }, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Field).padding(16.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent)
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent),
+                decorationBox = { inner -> if (link.isEmpty()) Text("https://", color = Muted, fontSize = 14.sp); inner() }
             )
-            GradientButton("Open") { /* TODO: resolve the link and start playing / downloading */ }
+            GradientButton("Save link") {
+                if (links.add(link)) link = "" else Toast.makeText(ctx, "This is not a valid link", Toast.LENGTH_SHORT).show()
+            }
+        }
+        if (links.items.isNotEmpty()) {
+            SectionHeader("Saved links", "${links.items.size}")
+            CardBox {
+                links.items.toList().forEach { url ->
+                    SiteRow(url, { onOpenUrl(url) }) {
+                        IconButton({ links.remove(url) }) { Icon(Icons.Outlined.Delete, "Remove", tint = Muted) }
+                    }
+                }
+            }
         }
     }
 }
