@@ -22,17 +22,21 @@ object Archive {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    suspend fun search(text: String): List<Movie> = withContext(Dispatchers.IO) {
-        val clean = text.replace(Regex("[^\\p{L}\\p{N} ]"), " ").trim()
-        val base = "collection:feature_films AND mediatype:movies"
-        val q = if (clean.isEmpty()) base else "$base AND title:($clean)"
+    /** Raw archive.org query, most downloaded first. */
+    suspend fun query(q: String, rows: Int = 48): List<Movie> = withContext(Dispatchers.IO) {
         val url = "https://archive.org/advancedsearch.php?q=${enc(q)}" +
-            "&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&sort%5B%5D=downloads+desc&rows=48&page=1&output=json"
+            "&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&sort%5B%5D=downloads+desc&rows=$rows&page=1&output=json"
         val docs = JSONObject(get(url)).getJSONObject("response").getJSONArray("docs")
         List(docs.length()) {
             val d = docs.getJSONObject(it)
             Movie(d.getString("identifier"), d.optString("title", "Untitled"), d.optString("year", ""))
         }
+    }
+
+    suspend fun search(text: String): List<Movie> {
+        val clean = text.replace(Regex("[^\\p{L}\\p{N} ]"), " ").trim()
+        val base = "collection:feature_films AND mediatype:movies"
+        return query(if (clean.isEmpty()) base else "$base AND title:($clean)")
     }
 
     suspend fun details(id: String): MovieDetails = withContext(Dispatchers.IO) {

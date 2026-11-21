@@ -4,6 +4,10 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -52,18 +56,61 @@ object Selected {
 
 private fun poster(id: String) = "https://archive.org/services/img/$id"
 
+private data class Cat(val name: String, val q: String)
+
+private const val BASE = "collection:feature_films AND mediatype:movies"
+private val cats = listOf(
+    Cat("Trending", BASE),
+    Cat("Sci-Fi", "$BASE AND subject:(sci-fi OR \"science fiction\")"),
+    Cat("Horror", "$BASE AND subject:horror"),
+    Cat("Comedy", "$BASE AND subject:comedy"),
+    Cat("Western", "$BASE AND subject:western"),
+    Cat("Cartoons", "collection:animationandcartoons AND mediatype:movies"),
+    Cat("Classic TV", "collection:classic_tv AND mediatype:movies")
+)
+
+@Composable
+private fun PosterCard(m: Movie, modifier: Modifier, onOpen: (Movie) -> Unit) {
+    Column(modifier.clickable { onOpen(m) }) {
+        AsyncImage(
+            model = poster(m.id), contentDescription = m.title, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).clip(RoundedCornerShape(10.dp)).background(Field)
+        )
+        Text(m.title, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+@Composable
+private fun CategoryRow(cat: Cat, onOpen: (Movie) -> Unit, onAll: () -> Unit) {
+    var items by remember(cat) { mutableStateOf<List<Movie>>(emptyList()) }
+    LaunchedEffect(cat) { try { items = Archive.query(cat.q, 15) } catch (e: Exception) { } }
+    if (items.isEmpty()) return
+    Column {
+        SectionHeader(cat.name, "All", onRight = onAll)
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(items, key = { it.id }) { m -> PosterCard(m, Modifier.width(110.dp), onOpen) }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
 @Composable
 fun HomeScreen(onOpen: (Movie) -> Unit) {
     var query by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf("") }
-    var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var sel by remember { mutableStateOf(-1) } // -1 = All (rows for every category)
+    var grid by remember { mutableStateOf<List<Movie>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
-    LaunchedEffect(submitted) {
+    LaunchedEffect(submitted, sel) {
+        if (submitted.isEmpty() && sel < 0) return@LaunchedEffect
         loading = true; error = false
-        try { movies = Archive.search(submitted) } catch (e: Exception) { error = true; movies = emptyList() }
+        try { grid = if (submitted.isNotEmpty()) Archive.search(submitted) else Archive.query(cats[sel].q, 60) }
+        catch (e: Exception) { error = true; grid = emptyList() }
         loading = false
     }
+    fun search() { submitted = query.trim(); if (submitted.isNotEmpty()) sel = -1 }
+
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             // App logo (replace with your real logo: painterResource(R.drawable.logo))
@@ -81,32 +128,39 @@ fun HomeScreen(onOpen: (Movie) -> Unit) {
                     query, { query = it }, Modifier.weight(1f), singleLine = true,
                     textStyle = TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { submitted = query.trim() }),
+                    keyboardActions = KeyboardActions(onSearch = { search() }),
                     decorationBox = { inner ->
                         if (query.isEmpty()) Text("Search movies", color = Muted, fontSize = 14.sp)
                         inner()
                     }
                 )
-                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { submitted = query.trim() }.padding(start = 8.dp))
+                Text("Search", color = Accent, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { search() }.padding(start = 8.dp))
             }
         }
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val tabs = listOf("All") + cats.map { it.name }
+            tabs.forEachIndexed { i, name ->
+                val on = submitted.isEmpty() && sel == i - 1
+                Box(
+                    Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(if (on) Accent else Field)
+                        .clickable { sel = i - 1; submitted = ""; query = "" }.padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text(name, color = if (on) OnAccent else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         when {
+            submitted.isEmpty() && sel < 0 -> LazyColumn(Modifier.fillMaxSize()) {
+                items(cats.size) { i -> CategoryRow(cats[i], onOpen, onAll = { sel = i }) }
+            }
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
             error -> Placeholder("Could not load movies. Check your internet.")
-            movies.isEmpty() -> Placeholder("No movies found")
+            grid.isEmpty() -> Placeholder("No movies found")
             else -> LazyVerticalGrid(
                 GridCells.Fixed(3), contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(movies, key = { it.id }) { m ->
-                    Column(Modifier.clickable { onOpen(m) }) {
-                        AsyncImage(
-                            model = poster(m.id), contentDescription = m.title, contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).clip(RoundedCornerShape(10.dp)).background(Field)
-                        )
-                        Text(m.title, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                    }
-                }
+                items(grid, key = { it.id }) { m -> PosterCard(m, Modifier, onOpen) }
             }
         }
     }
